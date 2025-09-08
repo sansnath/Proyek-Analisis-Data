@@ -6,11 +6,11 @@ import streamlit as st
 import folium
 from streamlit_folium import st_folium
 
-best_seller_df = pd.read_csv("/data/best_seller.csv")
-customer_order_df = pd.read_csv("/data/customer_order1.csv")
-product_review_df = pd.read_csv("/data/product_review.csv")
-product_order_df = pd.read_csv("/data/product_order.csv")
-payment_method_df = pd.read_csv("/data/payment_method.csv")
+best_seller_df = pd.read_csv("data/best_seller.csv")
+customer_order_df = pd.read_csv("data/customer_order1.csv")
+product_review_df = pd.read_csv("data/product_review.csv")
+product_order_df = pd.read_csv("data/product_order.csv")
+payment_method_df = pd.read_csv("data/payment_method.csv")
 
 
 def create_top_products_df(df):
