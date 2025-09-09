@@ -2,46 +2,54 @@ import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-import streamlit as st
 import folium
 from streamlit_folium import st_folium
 
 best_seller_df = pd.read_csv("data/best_seller.csv")
-customer_order_df = pd.read_csv("data/customer_order1.csv")
 product_review_df = pd.read_csv("data/product_review.csv")
 product_order_df = pd.read_csv("data/product_order.csv")
 payment_method_df = pd.read_csv("data/payment_method.csv")
+top_region_df = pd.read_csv("data/top_region.csv")
 
+product_order_df['order_purchase_timestamp'] = pd.to_datetime(product_order_df['order_purchase_timestamp'])
+
+st.sidebar.title("Filter Data")
+
+st.sidebar.subheader("Filter by Date Range")
+min_date = product_order_df['order_purchase_timestamp'].min().date()
+max_date = product_order_df['order_purchase_timestamp'].max().date()
+
+start_date = st.sidebar.date_input("Start Date", min_date, min_value=min_date, max_value=max_date)
+end_date = st.sidebar.date_input("End Date", max_date, min_value=min_date, max_value=max_date)
+
+if start_date > end_date:
+    st.sidebar.error("End Date must be after Start Date")
+
+st.sidebar.subheader("Filter by Product Category")
+product_categories = product_order_df['product_category_name_english'].unique()
+selected_category = st.sidebar.multiselect("Select Category", sorted(product_categories))
+
+filtered_orders = product_order_df[
+    (product_order_df['order_purchase_timestamp'].dt.date >= start_date) &
+    (product_order_df['order_purchase_timestamp'].dt.date <= end_date)
+]
+
+if selected_category:
+    filtered_orders = filtered_orders[filtered_orders['product_category_name_english'].isin(selected_category)]
 
 def create_top_products_df(df):
     top_products_df = (
         df.groupby('product_category_name_english')['order_id']
-        .nunique() 
-        .sort_values(ascending=False) 
+        .nunique()
+        .sort_values(ascending=False)
         .reset_index()
-        .head(10)  
+        .head(10)
     )
     top_products_df.rename(columns={
         'product_category_name_english': 'product_category',
         'order_id': 'Total Sales'
     }, inplace=True)
-    
     return top_products_df
-
-def create_top_region_df(df):
-    top_region_df = (
-        df.groupby(["customer_city", "customer_state"])
-        .agg({
-            "order_id": "count",
-            "geolocation_lat": "mean",
-            "geolocation_lng": "mean"
-        })
-        .sort_values(by="order_id", ascending=False)
-        .reset_index()
-        .head(20)
-    )
-    top_region_df.columns = ['City', 'State', 'Total Sales', 'Latitude', 'Longitude']
-    return top_region_df
 
 def create_product_review_df(df):
     top_product_review = (
@@ -51,7 +59,6 @@ def create_product_review_df(df):
         .reset_index()
         .head(10)
     )
-
     bad_product_review = (
         df.groupby("product_category_name_english")["review_score"]
         .mean()
@@ -61,8 +68,6 @@ def create_product_review_df(df):
     )
     bad_product_review.columns = ['Product Category', 'Review Score']
     top_product_review.columns = ['Product Category', 'Review Score']
-
-
     return top_product_review, bad_product_review
 
 def create_best_seller_df(df):
@@ -95,10 +100,12 @@ def create_popular_payment_df(df):
     })
     return payment_df
 
-top_products = create_top_products_df(product_order_df)
 st.markdown("<h1 style='text-align: center;'>E-Commerce Dashboard</h1>", unsafe_allow_html=True)
+
 st.subheader('Best Selling Product Category')
-fig, ax = plt.subplots(figsize=(10,6))
+top_products = create_top_products_df(filtered_orders)
+
+fig, ax = plt.subplots(figsize=(10, 6))
 sns.barplot(
     y="product_category",
     x="Total Sales",
@@ -109,27 +116,24 @@ sns.barplot(
 ax.set_title("Number of Sales by Product Category", loc="center", fontsize=15)
 ax.set_ylabel(None)
 st.pyplot(fig)
+
 with st.expander("See explanation"):
     st.write(
-        """Pada Chart ini terlihat bahwa Kategori Produk yang laku di E-Commerce ini adalah kategori
-        bet_bed_table dengan diikuti health_beauty dan sports_leisure. E-Commerce bisa mengambil langkah
-        untuk membuat strategi baru untuk meningkatkan lagi promosi pada kategori tersebut dan dapat
-        melakukan kerjasama dengan brand penyedia barang tersebut supaya dapat memaksimalkan kembali
-        pendapatan yang ada.
-        """
+        """Kategori produk yang paling laku menunjukkan tren permintaan tertinggi.
+        Perusahaan dapat memfokuskan promosi dan kerjasama pada kategori ini untuk
+        memaksimalkan pendapatan."""
     )
 
-
-Top_Region = create_top_region_df(customer_order_df)
-map_center = [Top_Region['Latitude'].mean(), Top_Region['Longitude'].mean()]
+st.subheader("Top Region Sales Map")
+map_center = [top_region_df['Latitude'].mean(), top_region_df['Longitude'].mean()]
 m = folium.Map(location=map_center, zoom_start=5)
 
-max_sales = Top_Region['Total Sales'].max()
+max_sales = top_region_df['Total Sales'].max()
 
-for _, row in Top_Region.iterrows():
+for _, row in top_region_df.head(20).iterrows():
     folium.CircleMarker(
         location=[row['Latitude'], row['Longitude']],
-        radius=(row['Total Sales'] / max_sales) * 20, 
+        radius=(row['Total Sales'] / max_sales) * 20,
         color='blue',
         fill=True,
         fill_color='blue',
@@ -141,20 +145,20 @@ for _, row in Top_Region.iterrows():
         """,
         tooltip=f"{row['City'].upper()} - {row['Total Sales']}"
     ).add_to(m)
-st.subheader("Top Region Sales Map")
+
 st_folium(m, width=800, height=500)
+
 with st.expander("See explanation"):
     st.write(
-        """Pada Chart ini terlihat bahwa daerah yang memiliki tingkat pembelian tertinggi memiliki
-        diameter lingkaran yang besar, sehingga dapat terlihat daerah mana yang menggunakan E-Commerce
-        ini secara masif. Perusahaan bisa mengambil langkah dengan menjadikan wilayah yang besar peminatnya
-        sebagai tujuan pasar mereka
-        """
+        """Wilayah dengan lingkaran terbesar menunjukkan area dengan tingkat penjualan tertinggi.
+        Informasi ini dapat membantu menentukan target pasar dan strategi distribusi."""
     )
 
-Top_Products_Review, Bad_Products_Review = create_product_review_df(product_review_df)
 st.subheader("Product Category Performance Overview")
+Top_Products_Review, Bad_Products_Review = create_product_review_df(product_review_df)
+
 fig, ax = plt.subplots(nrows=1, ncols=2, figsize=(18, 6))
+
 sns.barplot(
     y="Product Category",
     x="Review Score",
@@ -167,7 +171,7 @@ ax[0].set_xlim(0, 5)
 ax[0].set_ylabel(None)
 ax[0].set_xlabel("Review Score")
 
-sns.barplot( 
+sns.barplot(
     y="Product Category",
     x="Review Score",
     data=Top_Products_Review.sort_values(by="Review Score", ascending=False),
@@ -184,49 +188,45 @@ st.pyplot(fig)
 
 with st.expander("See explanation"):
     st.write(
-        """Pada Chart ini terlihat bahwa kategori produk yang memiliki rating tertinggi adalah berkaitan
-        dengan musik, fashion, dan juga buku sejenisnya. Dengan produk terburuk ada di bidang security
-        popok dan juga furniture kantor. Hal ini bisa menjadi petunjuk untuk memperkuat kategori barang
-        yang memiliki review score tertinggi dan dapat segera meninggalkan kategori barang yang memiliki
-        rating rendah
-        """
+        """Chart ini menampilkan perbandingan kategori dengan review terbaik dan terburuk.
+        Fokus pada kategori dengan rating tinggi dan evaluasi produk dengan rating rendah."""
     )
 
-Best_Seller = create_best_seller_df(best_seller_df)
 st.subheader("Best Seller Performance Overview")
+best_seller_filtered = create_best_seller_df(best_seller_df)
+
 fig, ax = plt.subplots(nrows=1, ncols=2, figsize=(18, 6))
+
 sns.barplot(
     y="Seller_id",
     x="Total Sales",
-    data=Best_Seller.sort_values(by="Total Sales", ascending=False),
+    data=best_seller_filtered.sort_values(by="Total Sales", ascending=False),
     palette=sns.color_palette("Blues_r", n_colors=10),
     ax=ax[0]
 )
 ax[0].set_title("Best Sellers in Terms of Selling", fontsize=15)
 ax[0].set_ylabel(None)
 ax[0].set_xlabel("Total Sales")
+
 sns.regplot(
-    data=Best_Seller,
+    data=best_seller_filtered,
     x='Total Sales',
     y='Review Score',
     ax=ax[1]
 )
-ax[1].set_ylim(0, Best_Seller['Review Score'].max() + 1)
-ax[1].set_title("Relationship Between Total Sales and Review Score", fontsize=15)
+ax[1].set_ylim(0, best_seller_filtered['Review Score'].max() + 1)
+ax[1].set_title("Sales vs Review Score", fontsize=15)
 ax[1].set_xlabel("Total Sales")
 ax[1].set_ylabel("Review Score")
 
 plt.suptitle("Best Seller Performance Overview", fontsize=20)
 plt.tight_layout()
 st.pyplot(fig)
+
 with st.expander("See explanation"):
     st.write(
-        """Pada Chart ini terlihat bahwa terdapat seller yang memiliki penjualan tertinggi pada 
-        E-Commerce ini, perusahaan bisa memberikan suatu benefit ataupun reward yang membuat seller 
-        menjadi nyaman untuk terus menggunakan platform E-Commerce ini. Chart ini juga melihatkan bahwa
-        seller terbaik tidak sebanding dengan review score yang ada, yang berarti harga barang serta promosi
-        dari seller bisa menjadi faktor lain dalam penjualan seller.
-        """
+        """Seller dengan penjualan tertinggi dapat diberi reward untuk meningkatkan loyalitas.
+        Hubungan antara total penjualan dan review membantu memahami faktor keberhasilan seller."""
     )
 
 st.subheader("Most Used Payment Method")
@@ -235,7 +235,7 @@ Popular_Payment_Method = create_popular_payment_df(payment_method_df)
 colors = ('#8B4513', '#FFF8DC', '#93C572', '#E67F0D')
 explode = [0.05, 0.1, 0.1, 0.1]
 
-fig, ax = plt.subplots(figsize=(6,6))
+fig, ax = plt.subplots(figsize=(6, 6))
 ax.pie(
     x=Popular_Payment_Method['Total Sales'],
     labels=Popular_Payment_Method['Payment Type'],
@@ -247,11 +247,9 @@ ax.pie(
 ax.set_title("Popular Payment Method", fontsize=16)
 
 st.pyplot(fig)
+
 with st.expander("See explanation"):
     st.write(
-        """Pada Chart ini terlihat bahwa pelanggan seringkali menggunakan kartu kredit sebagai
-        media utama pembayaran pada E-Commerce ini, perusahaan bisa memanfaatkan ini dengan bekerjasama
-        dengan perusahaan kartu kredit untuk memaksimalkan lagi penggunaan kartu kredit untuk media pembayaran
-        pada perusahaan ini
-        """
+        """Metode pembayaran yang paling sering digunakan dapat menjadi peluang
+        untuk menjalin kerja sama, seperti promo kartu kredit atau diskon khusus."""
     )
