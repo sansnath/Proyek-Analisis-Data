@@ -5,7 +5,7 @@ import seaborn as sns
 import folium
 from streamlit_folium import st_folium
 
-all_df = pd.read_csv("dashboard/all_df5.csv")
+all_df = pd.read_csv("dashboard/all_df10.csv")
 
 all_df['order_purchase_timestamp'] = pd.to_datetime(all_df['order_purchase_timestamp'])
 
