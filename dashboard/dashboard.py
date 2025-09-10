@@ -5,19 +5,15 @@ import seaborn as sns
 import folium
 from streamlit_folium import st_folium
 
-best_seller_df = pd.read_csv("data/best_seller.csv")
-product_review_df = pd.read_csv("data/product_review.csv")
-product_order_df = pd.read_csv("data/product_order.csv")
-payment_method_df = pd.read_csv("data/payment_method.csv")
-top_region_df = pd.read_csv("data/top_region.csv")
+all_df = pd.read_csv("dashboard/all_df5.csv")
 
-product_order_df['order_purchase_timestamp'] = pd.to_datetime(product_order_df['order_purchase_timestamp'])
+all_df['order_purchase_timestamp'] = pd.to_datetime(all_df['order_purchase_timestamp'])
 
 st.sidebar.title("Filter Data")
 
 st.sidebar.subheader("Filter by Date Range")
-min_date = product_order_df['order_purchase_timestamp'].min().date()
-max_date = product_order_df['order_purchase_timestamp'].max().date()
+min_date = all_df['order_purchase_timestamp'].min().date()
+max_date = all_df['order_purchase_timestamp'].max().date()
 
 start_date = st.sidebar.date_input("Start Date", min_date, min_value=min_date, max_value=max_date)
 end_date = st.sidebar.date_input("End Date", max_date, min_value=min_date, max_value=max_date)
@@ -26,12 +22,12 @@ if start_date > end_date:
     st.sidebar.error("End Date must be after Start Date")
 
 st.sidebar.subheader("Filter by Product Category")
-product_categories = product_order_df['product_category_name_english'].unique()
+product_categories = all_df['product_category_name_english'].unique()
 selected_category = st.sidebar.multiselect("Select Category", sorted(product_categories))
 
-filtered_orders = product_order_df[
-    (product_order_df['order_purchase_timestamp'].dt.date >= start_date) &
-    (product_order_df['order_purchase_timestamp'].dt.date <= end_date)
+filtered_orders = all_df[
+    (all_df['order_purchase_timestamp'].dt.date >= start_date) &
+    (all_df['order_purchase_timestamp'].dt.date <= end_date)
 ]
 
 if selected_category:
@@ -124,13 +120,20 @@ with st.expander("See explanation"):
         memaksimalkan pendapatan."""
     )
 
-st.subheader("Top Region Sales Map")
-map_center = [top_region_df['Latitude'].mean(), top_region_df['Longitude'].mean()]
+Top_Region = all_df.groupby(by=["customer_city", "customer_state"]).agg({
+    "order_id": "count",
+    "geolocation_lat": "mean",
+    "geolocation_lng": "mean"
+}).sort_values(by="order_id", ascending=False).reset_index()
+
+Top_Region.columns = ['City', 'State', 'Total Sales', 'Latitude', 'Longitude']
+
+map_center = [Top_Region['Latitude'].mean(), Top_Region['Longitude'].mean()]
 m = folium.Map(location=map_center, zoom_start=5)
 
-max_sales = top_region_df['Total Sales'].max()
+max_sales = Top_Region['Total Sales'].max()
 
-for _, row in top_region_df.head(20).iterrows():
+for _, row in Top_Region.head(20).iterrows():
     folium.CircleMarker(
         location=[row['Latitude'], row['Longitude']],
         radius=(row['Total Sales'] / max_sales) * 20,
@@ -146,8 +149,8 @@ for _, row in top_region_df.head(20).iterrows():
         tooltip=f"{row['City'].upper()} - {row['Total Sales']}"
     ).add_to(m)
 
+st.subheader("Top Region Sales Map")
 st_folium(m, width=800, height=500)
-
 with st.expander("See explanation"):
     st.write(
         """Wilayah dengan lingkaran terbesar menunjukkan area dengan tingkat penjualan tertinggi.
@@ -155,7 +158,7 @@ with st.expander("See explanation"):
     )
 
 st.subheader("Product Category Performance Overview")
-Top_Products_Review, Bad_Products_Review = create_product_review_df(product_review_df)
+Top_Products_Review, Bad_Products_Review = create_product_review_df(filtered_orders)
 
 fig, ax = plt.subplots(nrows=1, ncols=2, figsize=(18, 6))
 
@@ -185,7 +188,6 @@ ax[1].set_xlabel("Review Score")
 
 plt.tight_layout()
 st.pyplot(fig)
-
 with st.expander("See explanation"):
     st.write(
         """Chart ini menampilkan perbandingan kategori dengan review terbaik dan terburuk.
@@ -193,7 +195,7 @@ with st.expander("See explanation"):
     )
 
 st.subheader("Best Seller Performance Overview")
-best_seller_filtered = create_best_seller_df(best_seller_df)
+best_seller_filtered = create_best_seller_df(filtered_orders)
 
 fig, ax = plt.subplots(nrows=1, ncols=2, figsize=(18, 6))
 
@@ -222,15 +224,15 @@ ax[1].set_ylabel("Review Score")
 plt.suptitle("Best Seller Performance Overview", fontsize=20)
 plt.tight_layout()
 st.pyplot(fig)
-
 with st.expander("See explanation"):
     st.write(
         """Seller dengan penjualan tertinggi dapat diberi reward untuk meningkatkan loyalitas.
         Hubungan antara total penjualan dan review membantu memahami faktor keberhasilan seller."""
     )
 
+
 st.subheader("Most Used Payment Method")
-Popular_Payment_Method = create_popular_payment_df(payment_method_df)
+Popular_Payment_Method = create_popular_payment_df(filtered_orders)
 
 colors = ('#8B4513', '#FFF8DC', '#93C572', '#E67F0D')
 explode = [0.05, 0.1, 0.1, 0.1]
@@ -247,7 +249,6 @@ ax.pie(
 ax.set_title("Popular Payment Method", fontsize=16)
 
 st.pyplot(fig)
-
 with st.expander("See explanation"):
     st.write(
         """Metode pembayaran yang paling sering digunakan dapat menjadi peluang
