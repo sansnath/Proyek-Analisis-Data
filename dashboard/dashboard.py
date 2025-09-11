@@ -229,8 +229,22 @@ ax[0].set_title("Best Sellers in Terms of Selling", fontsize=15)
 ax[0].set_ylabel(None)
 ax[0].set_xlabel("Total Sales")
 
-best_seller_filtered['Sales_Category'] = pd.qcut(best_seller_filtered['Total Sales'], 4, labels=['Low', 'Medium', 'High', 'Very High'])
+_, bins = pd.qcut(
+    best_seller_filtered['Total Sales'],
+    q=4,
+    retbins=True,
+    duplicates='drop'
+)
 
+labels_map = ['Low', 'Medium', 'High', 'Very High']
+labels_used = labels_map[:len(bins)-1]
+
+best_seller_filtered['Sales_Category'] = pd.qcut(
+    best_seller_filtered['Total Sales'],
+    q=4,
+    labels=labels_used,
+    duplicates='drop'
+)
 sns.boxplot(
     data=best_seller_filtered,
     x='Sales_Category',
@@ -248,7 +262,7 @@ st.pyplot(fig)
 with st.expander("See explanation"):
     st.write(
         """Seller dengan penjualan tertinggi dapat diberi reward untuk meningkatkan loyalitas.
-        Chart ini juga melihatkan bahwa semakin tinggi total penjualan suatu produk, semakin stabil dan tinggi pula review score yang diterima."""
+        Chart ini juga melihatkan bahwa terdapat hubungan antara jumlah sales dengan rating yang dapat dilihat pada chart boxplot."""
     )
 
 
