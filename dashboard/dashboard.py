@@ -269,7 +269,7 @@ with st.expander("See explanation"):
 st.subheader("Most Used Payment Method")
 Popular_Payment_Method = create_popular_payment_df(filtered_orders)
 
-colors = ('#8B4513', '#FFF8DC', '#93C572', '#E67F0D')
+colors = ("#6495E5", '#4682B4', '#87CEEB', '#B0E0E6')
 explode = [0.05, 0.1, 0.1, 0.1]
 
 fig, ax = plt.subplots(figsize=(6, 6))
@@ -279,7 +279,7 @@ ax.pie(
     autopct='%1.1f%%',
     colors=colors,
     explode=explode,
-    textprops={'fontsize': 10}
+    textprops={'fontsize': 10},
 )
 ax.set_title("Popular Payment Method", fontsize=16)
 
