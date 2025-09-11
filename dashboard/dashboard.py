@@ -75,7 +75,6 @@ def create_best_seller_df(df):
         })
         .sort_values(by=["order_id", "review_score"], ascending=False)
         .reset_index()
-        .head(10)
     )
     best_seller_df.columns = ['Seller_id', 'Total Sales', 'Review Score']
     return best_seller_df
@@ -97,6 +96,25 @@ def create_popular_payment_df(df):
     return payment_df
 
 st.markdown("<h1 style='text-align: center;'>E-Commerce Dashboard</h1>", unsafe_allow_html=True)
+total_orders = filtered_orders['order_id'].count()
+unique_customers = filtered_orders['customer_id'].nunique()
+average_review = filtered_orders['review_score'].mean()
+unique_categories = filtered_orders['product_category_name_english'].nunique()
+
+st.markdown("### Key Metrics Overview")
+col1, col2, col3, col4 = st.columns(4)
+
+with col1:
+    st.metric("Total Orders", f"{total_orders:,}")
+
+with col2:
+    st.metric("Total Customers", f"{unique_customers:,}")
+
+with col3:
+    st.metric("Avg. Review Score", f"{average_review:.2f}")
+
+with col4:
+    st.metric("Product Categories", f"{unique_categories:,}")
 
 st.subheader('Best Selling Product Category')
 top_products = create_top_products_df(filtered_orders)
@@ -174,6 +192,7 @@ ax[0].set_xlim(0, 5)
 ax[0].set_ylabel(None)
 ax[0].set_xlabel("Review Score")
 
+
 sns.barplot(
     y="Product Category",
     x="Review Score",
@@ -202,7 +221,7 @@ fig, ax = plt.subplots(nrows=1, ncols=2, figsize=(18, 6))
 sns.barplot(
     y="Seller_id",
     x="Total Sales",
-    data=best_seller_filtered.sort_values(by="Total Sales", ascending=False),
+    data=best_seller_filtered.head(10).sort_values(by="Total Sales", ascending=False),
     palette=sns.color_palette("Blues_r", n_colors=10),
     ax=ax[0]
 )
@@ -210,14 +229,16 @@ ax[0].set_title("Best Sellers in Terms of Selling", fontsize=15)
 ax[0].set_ylabel(None)
 ax[0].set_xlabel("Total Sales")
 
-sns.regplot(
+best_seller_filtered['Sales_Category'] = pd.qcut(best_seller_filtered['Total Sales'], 4, labels=['Low', 'Medium', 'High', 'Very High'])
+
+sns.boxplot(
     data=best_seller_filtered,
-    x='Total Sales',
+    x='Sales_Category',
     y='Review Score',
     ax=ax[1]
 )
 ax[1].set_ylim(0, best_seller_filtered['Review Score'].max() + 1)
-ax[1].set_title("Sales vs Review Score", fontsize=15)
+ax[1].set_title("Relationship Between Total Sales and Review Score", fontsize=15)
 ax[1].set_xlabel("Total Sales")
 ax[1].set_ylabel("Review Score")
 
@@ -227,7 +248,7 @@ st.pyplot(fig)
 with st.expander("See explanation"):
     st.write(
         """Seller dengan penjualan tertinggi dapat diberi reward untuk meningkatkan loyalitas.
-        Hubungan antara total penjualan dan review membantu memahami faktor keberhasilan seller."""
+        Chart ini juga melihatkan bahwa semakin tinggi total penjualan suatu produk, semakin stabil dan tinggi pula review score yang diterima."""
     )
 
 
