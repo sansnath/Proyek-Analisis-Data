@@ -3,6 +3,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import folium
+import matplotlib.cm as cm
+import matplotlib.colors as mcolors
 from streamlit_folium import st_folium
 
 all_df = pd.read_csv("dashboard/all_df10.csv")
@@ -150,15 +152,22 @@ map_center = [Top_Region['Latitude'].mean(), Top_Region['Longitude'].mean()]
 m = folium.Map(location=map_center, zoom_start=5)
 
 max_sales = Top_Region['Total Sales'].max()
+min_sales = Top_Region['Total Sales'].min()
+
+colormap = cm.get_cmap('RdYlBu_r') 
+def get_color(value):
+    normalized_value = (value - min_sales) / (max_sales - min_sales) 
+    rgba_color = colormap(normalized_value)
+    return mcolors.to_hex(rgba_color)  
 
 for _, row in Top_Region.head(20).iterrows():
     folium.CircleMarker(
         location=[row['Latitude'], row['Longitude']],
-        radius=(row['Total Sales'] / max_sales) * 20,
-        color='blue',
+        radius=(row['Total Sales'] / max_sales) * 20,  
+        color=get_color(row['Total Sales']),           
         fill=True,
-        fill_color='blue',
-        fill_opacity=0.6,
+        fill_color=get_color(row['Total Sales']),
+        fill_opacity=0.7,
         popup=f"""
         <b>City:</b> {row['City']}<br>
         <b>State:</b> {row['State']}<br>
@@ -169,10 +178,13 @@ for _, row in Top_Region.head(20).iterrows():
 
 st.subheader("Top Region Sales Map")
 st_folium(m, width=800, height=500)
+
 with st.expander("See explanation"):
     st.write(
-        """Wilayah dengan lingkaran terbesar menunjukkan area dengan tingkat penjualan tertinggi.
-        Informasi ini dapat membantu menentukan target pasar dan strategi distribusi."""
+        """
+        Lingkaran **lebih besar dan lebih gelap** menunjukkan wilayah dengan **penjualan yang lebih tinggi**.
+        Warna membantu membedakan tingkat penjualan, sehingga mudah mengidentifikasi kota dengan performa terbaik.
+        """
     )
 
 st.subheader("Product Category Performance Overview")
@@ -180,11 +192,15 @@ Top_Products_Review, Bad_Products_Review = create_product_review_df(filtered_ord
 
 fig, ax = plt.subplots(nrows=1, ncols=2, figsize=(18, 6))
 
+Bad_Products_Review = Bad_Products_Review.sort_values(by="Review Score", ascending=True).reset_index(drop=True)
+
+bad_colors = ['red' if i < 3 else 'lightgray' for i in range(len(Bad_Products_Review))]
+
 sns.barplot(
     y="Product Category",
     x="Review Score",
-    data=Bad_Products_Review.sort_values(by="Review Score", ascending=True),
-    palette=sns.color_palette("Blues_r", n_colors=10),
+    data=Bad_Products_Review,
+    palette=bad_colors,
     ax=ax[0]
 )
 ax[0].set_title("Bad Review Products", loc="center", fontsize=15)
@@ -192,12 +208,15 @@ ax[0].set_xlim(0, 5)
 ax[0].set_ylabel(None)
 ax[0].set_xlabel("Review Score")
 
+Top_Products_Review = Top_Products_Review.sort_values(by="Review Score", ascending=False).reset_index(drop=True)
+
+good_colors = ['green' if i < 3 else 'lightgray' for i in range(len(Top_Products_Review))]
 
 sns.barplot(
     y="Product Category",
     x="Review Score",
-    data=Top_Products_Review.sort_values(by="Review Score", ascending=False),
-    palette=sns.color_palette("Blues_r", n_colors=10),
+    data=Top_Products_Review,
+    palette=good_colors,
     ax=ax[1]
 )
 ax[1].set_title("Good Review Products", loc="center", fontsize=15)
@@ -207,10 +226,18 @@ ax[1].set_xlabel("Review Score")
 
 plt.tight_layout()
 st.pyplot(fig)
+
 with st.expander("See explanation"):
     st.write(
-        """Chart ini menampilkan perbandingan kategori dengan review terbaik dan terburuk.
-        Fokus pada kategori dengan rating tinggi dan evaluasi produk dengan rating rendah."""
+        """
+        Chart ini menampilkan kategori produk dengan review terbaik dan terburuk.
+        - **Hijau** menunjukkan 3 produk dengan review terbaik.
+        - **Merah** menunjukkan 3 produk dengan review terburuk.
+        - **Abu-abu** digunakan untuk kategori lain agar fokus tetap terlihat pada yang paling penting.
+        
+        Visualisasi ini membantu tim untuk fokus meningkatkan kualitas produk yang memiliki ulasan buruk
+        serta memaksimalkan potensi dari produk dengan ulasan terbaik.
+        """
     )
 
 st.subheader("Best Seller Performance Overview")
